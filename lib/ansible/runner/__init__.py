@@ -18,7 +18,7 @@
 import multiprocessing
 import signal
 import os
-import pwd
+#import pwd
 import Queue
 import random
 import traceback
@@ -32,6 +32,7 @@ import pipes
 import jinja2
 import subprocess
 import getpass
+import sys
 
 import ansible.constants as C
 import ansible.inventory
@@ -46,6 +47,7 @@ import connection
 from return_data import ReturnData
 from ansible.callbacks import DefaultRunnerCallbacks, vv
 from ansible.module_common import ModuleReplacer
+from ansible import callbacks as cb
 
 module_replacer = ModuleReplacer(strip_comments=False)
 
@@ -56,14 +58,62 @@ except ImportError:
     HAS_ATFORK=False
 
 multiprocessing_runner = None
-        
+
 OUTPUT_LOCKFILE  = tempfile.TemporaryFile()
 PROCESS_LOCKFILE = tempfile.TemporaryFile()
 
 ################################################
 
-def _executor_hook(job_queue, result_queue, new_stdin):
+class RunnerMemo:
+    def __init__(self, host_list,module_path,module_name,module_args,forks,timeout,pattern,remote_user,remote_pass,remote_port,
+                 private_key_file,sudo_pass,background,basedir,setup_cache,vars_cache,transport,conditional,callbacks,
+                 sudo,sudo_user,module_vars,default_vars,is_playbook,inventory,subset,check,diff,environment,
+                 complex_args,error_on_undefined_vars,accelerate,accelerate_ipv6,accelerate_port,su,su_user,
+                 su_pass,vault_pass,run_hosts,no_log,run_once):
+        self.host_list = host_list
+        self.module_path = module_path
+        self.module_name = module_name
+        self.module_args = module_args
+        self.forks = forks
+        self.timeout = timeout
+        self.pattern = pattern
+        self.remote_user = remote_user
+        self.remote_pass = remote_pass
+        self.remote_port = remote_port
+        self.private_key_file = private_key_file
+        self.sudo_pass = sudo_pass
+        self.background = background
+        self.basedir = basedir
+        self.setup_cache = setup_cache
+        self.vars_cache = vars_cache
+        self.transport = transport
+        self.conditional = conditional
+        self.callbacks = None
+        self.sudo = sudo
+        self.sudo_user = sudo_user
+        self.module_vars = module_vars
+        self.default_vars = default_vars
+        self.is_playbook = is_playbook
+        self.inventory = inventory
+        self.subset = subset
+        self.check = check
+        self.diff = diff
+        self.environment = environment
+        self.complex_args = complex_args
+        self.error_on_undefined_vars = error_on_undefined_vars
+        self.accelerate = accelerate
+        self.accelerate_ipv6 = accelerate_ipv6
+        self.accelerate_port = accelerate_port
+        self.su = su
+        self.su_user = su_user
+        self.su_pass = su_pass
+        self.vault_pass = vault_pass
+        self.run_hosts = run_hosts
+        self.no_log = no_log
+        self.run_once = run_once
+        self.verbosity=utils.VERBOSITY
 
+def _executor_hook(job_queue, result_queue, new_stdin, runnerMemo):
     # attempt workaround of https://github.com/newsapps/beeswithmachineguns/issues/17
     # this function also not present in CentOS 6
     if HAS_ATFORK:
@@ -73,11 +123,56 @@ def _executor_hook(job_queue, result_queue, new_stdin):
     while not job_queue.empty():
         try:
             host = job_queue.get(block=False)
+            global multiprocessing_runner
+            if multiprocessing_runner == None:
+                stats = cb.AggregateStats()
+                runner_cb = cb.PlaybookRunnerCallbacks(stats, verbose=runnerMemo.verbosity)#verbose=utils.VERBOSITY)
+                multiprocessing_runner = Runner(runnerMemo.host_list,
+                                                runnerMemo.module_path,
+                                                runnerMemo.module_name,
+                                                runnerMemo.module_args,
+                                                runnerMemo.forks,
+                                                runnerMemo.timeout,
+                                                runnerMemo.pattern,
+                                                runnerMemo.remote_user,
+                                                runnerMemo.remote_pass,
+                                                runnerMemo.remote_port,
+                                                runnerMemo.private_key_file,
+                                                runnerMemo.sudo_pass,
+                                                runnerMemo.background,
+                                                runnerMemo.basedir,
+                                                runnerMemo.setup_cache,
+                                                runnerMemo.vars_cache,
+                                                runnerMemo.transport,
+                                                runnerMemo.conditional,
+                                                runner_cb,
+                                                runnerMemo.sudo,
+                                                runnerMemo.sudo_user,
+                                                runnerMemo.module_vars,
+                                                runnerMemo.default_vars,
+                                                runnerMemo.is_playbook,
+                                                runnerMemo.inventory,
+                                                runnerMemo.subset,
+                                                runnerMemo.check,
+                                                runnerMemo.diff,
+                                                runnerMemo.environment,
+                                                runnerMemo.complex_args,
+                                                runnerMemo.error_on_undefined_vars,
+                                                runnerMemo.accelerate,
+                                                runnerMemo.accelerate_ipv6,
+                                                runnerMemo.accelerate_port,
+                                                runnerMemo.su,
+                                                runnerMemo.su_user,
+                                                runnerMemo.su_pass,
+                                                runnerMemo.vault_pass,
+                                                runnerMemo.run_hosts,
+                                                runnerMemo.no_log,
+                                                runnerMemo.run_once)
             return_data = multiprocessing_runner._executor(host, new_stdin)
             result_queue.put(return_data)
         except Queue.Empty:
             pass
-        except:
+        except Exception:
             traceback.print_exc()
 
 class HostVars(dict):
@@ -147,6 +242,13 @@ class Runner(object):
         run_once=False,                     # option to enable/disable host bypass loop for a given task
         ):
 
+
+        self.memo = RunnerMemo(host_list,module_path,module_name,module_args,forks,timeout,pattern,remote_user,remote_pass,
+              remote_port,private_key_file,sudo_pass,background,basedir,setup_cache,vars_cache,transport,
+              conditional,callbacks,sudo,sudo_user,module_vars,default_vars,is_playbook,inventory,subset,
+              check,diff,environment,complex_args,error_on_undefined_vars,accelerate,accelerate_ipv6,
+              accelerate_port,su,su_user,su_pass,vault_pass,run_hosts,no_log,run_once)
+
         # used to lock multiprocess inputs and outputs at various levels
         self.output_lockfile  = OUTPUT_LOCKFILE
         self.process_lockfile = PROCESS_LOCKFILE
@@ -204,11 +306,11 @@ class Runner(object):
             # if the transport is 'smart' see if SSH can support ControlPersist if not use paramiko
             # 'smart' is the default since 1.2.1/1.3
             cmd = subprocess.Popen(['ssh','-o','ControlPersist'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            (out, err) = cmd.communicate() 
+            (out, err) = cmd.communicate()
             if "Bad configuration option" in err:
                 self.transport = "paramiko"
             else:
-                self.transport = "ssh" 
+                self.transport = "ssh"
 
         # save the original transport, in case it gets
         # changed later via options like accelerate
@@ -224,7 +326,7 @@ class Runner(object):
         self.run_hosts = run_hosts
 
         if self.transport == 'local':
-            self.remote_user = pwd.getpwuid(os.geteuid())[0]
+            self.remote_user = getpass.getuser()# pwd.getpwuid(os.geteuid())[0]
 
         if module_path is not None:
             for i in module_path.split(os.pathsep):
@@ -307,7 +409,7 @@ class Runner(object):
         delegate = {}
 
         # allow delegated host to be templated
-        delegate['host'] = template.template(self.basedir, host, 
+        delegate['host'] = template.template(self.basedir, host,
                                 remote_inject, fail_on_undefined=True)
 
         delegate['inject'] = remote_inject.copy()
@@ -323,14 +425,14 @@ class Runner(object):
 
         this_host = delegate['host']
 
-        # get the vars for the delegate by it's name        
+        # get the vars for the delegate by it's name
         try:
             this_info = delegate['inject']['hostvars'][this_host]
         except:
             # make sure the inject is empty for non-inventory hosts
             this_info = {}
 
-        # get the real ssh_address for the delegate        
+        # get the real ssh_address for the delegate
         # and allow ansible_ssh_host to be templated
         delegate['ssh_host'] = template.template(self.basedir,
                             this_info.get('ansible_ssh_host', this_host),
@@ -341,7 +443,7 @@ class Runner(object):
         delegate['user'] = self._compute_delegate_user(this_host, delegate['inject'])
 
         delegate['pass'] = this_info.get('ansible_ssh_pass', password)
-        delegate['private_key_file'] = this_info.get('ansible_ssh_private_key_file', 
+        delegate['private_key_file'] = this_info.get('ansible_ssh_private_key_file',
                                         self.private_key_file)
         delegate['transport'] = this_info.get('ansible_connection', self.transport)
         delegate['sudo_pass'] = this_info.get('ansible_sudo_pass', self.sudo_pass)
@@ -511,7 +613,7 @@ class Runner(object):
 
         try:
             fileno = sys.stdin.fileno()
-        except ValueError:
+        except:
             fileno = None
 
         try:
@@ -857,7 +959,7 @@ class Runner(object):
                     if utils.check_conditional(cond, self.basedir, inject, fail_on_undefined=self.error_on_undefined_vars):
                         break
                 if result.result['attempts'] == retries and not utils.check_conditional(cond, self.basedir, inject, fail_on_undefined=self.error_on_undefined_vars):
-                    result.result['failed'] = True 
+                    result.result['failed'] = True
                     result.result['msg'] = "Task failed as maximum retries was encountered"
             else:
                 result.result['attempts'] = 0
@@ -935,7 +1037,7 @@ class Runner(object):
             # even when conn has pipelining, old style modules need tmp to store arguments
             return True
         return False
-    
+
 
     # *****************************************************
 
@@ -1054,7 +1156,7 @@ class Runner(object):
         rc = conn.shell.join_path(utils.last_non_blank_line(result['stdout']).strip(), '')
         # Catch failure conditions, files should never be
         # written to locations in /.
-        if rc == '/': 
+        if rc == '/':
             raise errors.AnsibleError('failed to resolve remote temporary directory from %s: `%s` returned empty string' % (basetmp, cmd))
         return rc
 
@@ -1078,9 +1180,9 @@ class Runner(object):
         module_data
         ) = self._configure_module(conn, module_name, module_args, inject, complex_args)
         module_remote_path = conn.shell.join_path(tmp, module_name)
-        
+
         self._transfer_str(conn, tmp, module_name, module_data)
-         
+
         return (module_remote_path, module_style, module_shebang)
 
     # *****************************************************
@@ -1117,7 +1219,7 @@ class Runner(object):
 
         try:
             fileno = sys.stdin.fileno()
-        except ValueError:
+        except:
             fileno = None
 
         workers = []
@@ -1132,7 +1234,7 @@ class Runner(object):
                     # using the one that was passed in
                     pass
             prc = multiprocessing.Process(target=_executor_hook,
-                args=(job_queue, result_queue, new_stdin))
+                args=(job_queue, result_queue, new_stdin,self.memo))
             prc.start()
             workers.append(prc)
 
@@ -1143,7 +1245,7 @@ class Runner(object):
             for worker in workers:
                 worker.terminate()
                 worker.join()
-        
+
         results = []
         try:
             while not result_queue.empty():

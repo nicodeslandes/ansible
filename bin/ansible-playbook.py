@@ -24,6 +24,7 @@
 import sys
 import os
 import stat
+import multiprocessing
 
 import ansible.playbook
 import ansible.constants as C
@@ -307,6 +308,7 @@ def main(args):
 
 
 if __name__ == "__main__":
+    #multiprocessing.set_start_method('fork')
     display(" ", log_only=True)
     display(" ".join(sys.argv), log_only=True)
     display(" ", log_only=True)

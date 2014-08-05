@@ -16,6 +16,7 @@
 # along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import platform
 import re
 import codecs
 import jinja2
@@ -28,7 +29,7 @@ import ansible.constants as C
 import time
 import subprocess
 import datetime
-import pwd
+#import pwd
 import ast
 import traceback
 
@@ -255,11 +256,12 @@ def template_from_file(basedir, path, vars, vault_password=None):
         error = errors.AnsibleError(msg)
         raise error
     vars = vars.copy()
-    try:
-        template_uid = pwd.getpwuid(os.stat(realpath).st_uid).pw_name
-    except:
-        template_uid = os.stat(realpath).st_uid
-    vars['template_host']   = os.uname()[1]
+    #try:
+    #    template_uid = pwd.getpwuid(os.stat(realpath).st_uid).pw_name
+    #except:
+    #    template_uid = os.stat(realpath).st_uid
+    template_uid = os.stat(realpath).st_uid
+    vars['template_host']   = platform.uname()[1]
     vars['template_path']   = realpath
     vars['template_mtime']  = datetime.datetime.fromtimestamp(os.path.getmtime(realpath))
     vars['template_uid']    = template_uid

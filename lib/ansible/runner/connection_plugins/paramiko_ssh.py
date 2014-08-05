@@ -30,10 +30,10 @@ import socket
 import random
 import logging
 import traceback
-import fcntl
+#import fcntl
 import re
 import sys
-from termios import tcflush, TCIFLUSH
+#from termios import tcflush, TCIFLUSH
 from binascii import hexlify
 from ansible.callbacks import vvv
 from ansible import errors
@@ -73,8 +73,8 @@ class MyAddPolicy(object):
 
         if C.HOST_KEY_CHECKING:
 
-            fcntl.lockf(self.runner.process_lockfile, fcntl.LOCK_EX)
-            fcntl.lockf(self.runner.output_lockfile, fcntl.LOCK_EX)
+            #fcntl.lockf(self.runner.process_lockfile, fcntl.LOCK_EX)
+            #fcntl.lockf(self.runner.output_lockfile, fcntl.LOCK_EX)
 
             old_stdin = sys.stdin
             sys.stdin = self.runner._new_stdin
@@ -82,17 +82,17 @@ class MyAddPolicy(object):
             ktype = key.get_name()
             
             # clear out any premature input on sys.stdin
-            tcflush(sys.stdin, TCIFLUSH)
+            #tcflush(sys.stdin, TCIFLUSH)
 
             inp = raw_input(AUTHENTICITY_MSG % (hostname, ktype, fingerprint))
             sys.stdin = old_stdin
             if inp not in ['yes','y','']:
-                fcntl.flock(self.runner.output_lockfile, fcntl.LOCK_UN)
-                fcntl.flock(self.runner.process_lockfile, fcntl.LOCK_UN)
+                #fcntl.flock(self.runner.output_lockfile, fcntl.LOCK_UN)
+                #fcntl.flock(self.runner.process_lockfile, fcntl.LOCK_UN)
                 raise errors.AnsibleError("host connection rejected by user")
 
-            fcntl.lockf(self.runner.output_lockfile, fcntl.LOCK_UN)
-            fcntl.lockf(self.runner.process_lockfile, fcntl.LOCK_UN)
+            #fcntl.lockf(self.runner.output_lockfile, fcntl.LOCK_UN)
+            #fcntl.lockf(self.runner.process_lockfile, fcntl.LOCK_UN)
 
 
         key._added_by_ansible_this_time = True
@@ -331,7 +331,7 @@ class Connection(object):
                 os.makedirs(dirname)
 
             KEY_LOCK = open(lockfile, 'w')
-            fcntl.lockf(KEY_LOCK, fcntl.LOCK_EX)
+            #fcntl.lockf(KEY_LOCK, fcntl.LOCK_EX)
             try:
                 # just in case any were added recently
                 self.ssh.load_system_host_keys()
@@ -342,7 +342,7 @@ class Connection(object):
                 # and caught earlier
                 traceback.print_exc()
                 pass
-            fcntl.lockf(KEY_LOCK, fcntl.LOCK_UN)
+            #fcntl.lockf(KEY_LOCK, fcntl.LOCK_UN)
 
         self.ssh.close()
         

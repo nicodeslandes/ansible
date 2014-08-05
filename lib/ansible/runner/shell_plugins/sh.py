@@ -31,7 +31,7 @@ class ShellModule(object):
         return ' '.join(['%s=%s' % (k, pipes.quote(unicode(v))) for k,v in env.items()])
 
     def join_path(self, *args):
-        return os.path.join(*args)
+        return os.path.join(*args).replace('\\','/')
 
     def path_has_trailing_slash(self, path):
         return path.endswith('/')

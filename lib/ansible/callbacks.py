@@ -23,8 +23,9 @@ import subprocess
 import random
 import fnmatch
 import tempfile
-import fcntl
+#import fcntl
 import constants
+import screen
 from ansible.color import stringc
 
 import logging
@@ -76,44 +77,46 @@ cowsay, noncow = get_cowsay_info()
 def log_lockfile():
     # create the path for the lockfile and open it
     tempdir = tempfile.gettempdir()
-    uid = os.getuid()
+    uid = getpass.getuser()#os.getuid()
     path = os.path.join(tempdir, ".ansible-lock.%s" % uid)
     lockfile = open(path, 'w')
-    # use fcntl to set FD_CLOEXEC on the file descriptor, 
+    # use fcntl to set FD_CLOEXEC on the file descriptor,
     # so that we don't leak the file descriptor later
     lockfile_fd = lockfile.fileno()
-    old_flags = fcntl.fcntl(lockfile_fd, fcntl.F_GETFD)
-    fcntl.fcntl(lockfile_fd, fcntl.F_SETFD, old_flags | fcntl.FD_CLOEXEC)
+    #old_flags = fcntl.fcntl(lockfile_fd, fcntl.F_GETFD)
+    #fcntl.fcntl(lockfile_fd, fcntl.F_SETFD, old_flags | fcntl.FD_CLOEXEC)
     return lockfile
-    
+
 LOG_LOCK = log_lockfile()
 
 def log_flock(runner):
-    if runner is not None:
-        try:
-            fcntl.lockf(runner.output_lockfile, fcntl.LOCK_EX)
-        except OSError:
-            # already got closed?
-            pass
-    else:
-        try:
-            fcntl.lockf(LOG_LOCK, fcntl.LOCK_EX)
-        except OSError:
-            pass
+    return
+    # if runner is not None:
+        # try:
+            # fcntl.lockf(runner.output_lockfile, fcntl.LOCK_EX)
+        # except OSError:
+            # # already got closed?
+            # pass
+    # else:
+        # try:
+            # fcntl.lockf(LOG_LOCK, fcntl.LOCK_EX)
+        # except OSError:
+            # pass
 
 
 def log_unflock(runner):
-    if runner is not None:
-        try:
-            fcntl.lockf(runner.output_lockfile, fcntl.LOCK_UN)
-        except OSError:
-            # already got closed?
-            pass
-    else:
-        try:
-            fcntl.lockf(LOG_LOCK, fcntl.LOCK_UN)
-        except OSError:
-            pass
+    return
+    # if runner is not None:
+        # try:
+            # fcntl.lockf(runner.output_lockfile, fcntl.LOCK_UN)
+        # except OSError:
+            # # already got closed?
+            # pass
+    # else:
+        # try:
+            # fcntl.lockf(LOG_LOCK, fcntl.LOCK_UN)
+        # except OSError:
+            # pass
 
 def set_playbook(callback, playbook):
     ''' used to notify callback plugins of playbook context '''
@@ -136,20 +139,8 @@ def set_task(callback, task):
 def display(msg, color=None, stderr=False, screen_only=False, log_only=False, runner=None):
     # prevent a very rare case of interlaced multiprocess I/O
     log_flock(runner)
-    msg2 = msg
-    if color:
-        msg2 = stringc(msg, color)
     if not log_only:
-        if not stderr:
-            try:
-                print msg2
-            except UnicodeEncodeError:
-                print msg2.encode('utf-8')
-        else:
-            try:
-                print >>sys.stderr, msg2
-            except UnicodeEncodeError:
-                print >>sys.stderr, msg2.encode('utf-8')
+        screen.display_on_screen(msg, color, stderr)
     if constants.DEFAULT_LOG_PATH != '':
         while msg.startswith("\n"):
             msg = msg.replace("\n","")

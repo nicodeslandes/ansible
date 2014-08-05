@@ -35,8 +35,8 @@ import ast
 import time
 import StringIO
 import stat
-import termios
-import tty
+#import termios
+#import tty
 import pipes
 import random
 import difflib
@@ -744,12 +744,13 @@ def version(prog):
 def getch():
     ''' read in a single character '''
     fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
+    #old_settings = termios.tcgetattr(fd)
     try:
-        tty.setraw(sys.stdin.fileno())
+        #tty.setraw(sys.stdin.fileno())
         ch = sys.stdin.read(1)
     finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        #termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        pass
     return ch
 
 def sanitize_output(str):
