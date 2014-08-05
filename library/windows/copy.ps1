@@ -17,18 +17,36 @@
 # WANT_JSON
 # POWERSHELL_COMMON
 
-# $params is not currently used in this module
+$ErrorActionPreference = "Stop"
+trap
+{
+	Fail-Json $_.ToString()
+};
+
+$src = $params.src
+$dest = $params.dest
+
+Set-Attr $result.copy src $src;
+
 $params = Parse-Args $args;
 
 $result = New-Object psobject @{
     copy = New-Object psobject
-    changed = $false
-};
+}
 
-Set-Attr $result.copy src $params.src;
-Set-Attr $result.copy dest $params.dest;
+$src = $params.src
+$dest = $params.dest
+
+Set-Attr $result.copy src $src;
+Set-Attr $result.copy dest $dest;
 Set-Attr $result.copy original_basename $params.original_basename;
+Set-Attr $result changed $true;
 
-cp $params.src $params.dest
+$destParent = [IO.Path]::GetDirectoryName($dest)
+if (!(Test-Path -PathType Container $destParent)) {
+	mkdir -Force $destParent
+}
+
+cp $src $dest
 
 Exit-Json $result;
