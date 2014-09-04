@@ -52,7 +52,7 @@ class Connection(object):
         self.host = host
         self.port = port
         self.user = user
-        self.password = password
+        self.password = password if password is not None else ""
         self.has_pipelining = False
         self.default_shell = 'powershell'
         self.default_suffixes = ['.ps1', '']
@@ -77,11 +77,14 @@ class Connection(object):
             transport_schemes = reversed(transport_schemes)
         exc = None
         for transport, scheme in transport_schemes:
+            if '@' in self.user:
+                transport = 'kerberos'
             endpoint = urlparse.urlunsplit((scheme, netloc, '/wsman', '', ''))
             vvvv('WINRM CONNECT: transport=%s endpoint=%s' % (transport, endpoint),
                  host=self.host)
             protocol = Protocol(endpoint, transport=transport,
                                 username=self.user, password=self.password)
+            protocol.timeout = 'PT3600S'
             try:
                 protocol.send_message('')
                 _winrm_cache[cache_key] = protocol
