@@ -83,7 +83,7 @@ class Connection(object):
             vvvv('WINRM CONNECT: transport=%s endpoint=%s' % (transport, endpoint),
                  host=self.host)
             protocol = Protocol(endpoint, transport=transport,
-                                username=self.user, password=self.password)
+                                username=self.user, password=self.password, enable_kerberos_delegation=True)
             protocol.timeout = 'PT3600S'
             try:
                 protocol.send_message('')
